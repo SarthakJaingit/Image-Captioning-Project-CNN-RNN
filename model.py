@@ -26,26 +26,53 @@ class DecoderRNN(nn.Module):
         super(DecoderRNN, self).__init__()
         
         self.hidden_size = hidden_size
+        self.vocab_size = vocab_size
         self.embedding = nn.Embedding(vocab_size, embed_size)
         self.lstm = nn.LSTM(embed_size, hidden_size, num_layers = num_layers, batch_first = True)
         self.fc1 = nn.Linear(hidden_size, vocab_size)
     
     def forward(self, features, captions):
         
+        #Put all the captions except the last word in embedding shape: (10, 11, 256) 
+        embedded_captions = self.embedding(captions[:, :-1])
         batch_size = captions.size(0)
-        seq_length = captions.size(1)
         
-        embedded_captions = self.embedding(captions)
-        print(embedded_captions.size())
-        print(features.size())
-        out, hidden = self.lstm(embedded_captions, features)
-        out = out.view(-1, self.hidden_size)
+        #Add the features a another part of the sequence length so caption_features.shape == (10, 12, 256)
+        features = features.unsqueeze(1)
+        caption_features = torch.cat((features, embedded_captions), 1)
+        
+        out, _ = self.lstm(caption_features)
+        out = out.contiguous().view(-1, self.hidden_size)
         
         prob_word = self.fc1(out)
-        prob_word = prob_word.view(batch_size, seq_length, -1)
+        prob_word = prob_word.view(batch_size, -1, self.vocab_size)
         
-        return prob_word, hidden
+        return prob_word
 
     def sample(self, inputs, states=None, max_len=20):
         " accepts pre-processed image tensor (inputs) and returns predicted sentence (list of tensor ids of length max_len) "
-        pass
+        pred_caption = list()
+        states = (torch.randn(1, 1, self.hidden_size).to(inputs.device), 
+                  torch.randn(1, 1, self.hidden_size).to(inputs.device))
+        for index in range(max_len):
+            vocab_hidden_size, states = self.lstm(inputs, states)
+            vocab_prob = self.fc1(vocab_hidden_size)
+            _, pred_word = torch.topk(vocab_prob, 1)
+            pred_caption.append(int(pred_word))
+            
+            inputs = self.embedding(pred_word).squeeze(0)
+            
+         
+        return pred_caption
+            
+            
+         
+        
+        
+        
+        
+        
+        
+        
+        
+        
