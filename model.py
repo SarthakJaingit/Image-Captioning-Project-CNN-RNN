@@ -42,7 +42,6 @@ class DecoderRNN(nn.Module):
         caption_features = torch.cat((features, embedded_captions), 1)
         
         out, _ = self.lstm(caption_features)
-        out = out.contiguous().view(-1, self.hidden_size)
         
         prob_word = self.fc1(out)
         prob_word = prob_word.view(batch_size, -1, self.vocab_size)
